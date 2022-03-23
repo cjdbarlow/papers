@@ -1,0 +1,207 @@
+---
+title: ""
+output: html_document
+---
+
+```{r setup, echo=FALSE, include = FALSE, eval = TRUE}
+
+#Data cleaning and analysis
+
+## Load packages
+library(readxl)
+library(tidyverse)
+library(janitor)
+library(BayesFactor)
+library(zoo)
+
+
+## Define functions
+### Prop test
+prop_fn = function(control_alive, control_dead, intervention_alive, intervention_dead) {
+  control_n = control_alive + control_dead
+  intervention_n = intervention_alive + intervention_dead
+  prop = prop.test(x = c(control_dead, intervention_dead),
+            n = c(control_n, intervention_n),
+            p = NULL,
+            alternative = "two.sided",
+            correct = FALSE)
+  round(prop$p.value, 3)
+}
+
+prop_fn = Vectorize(prop_fn)
+
+### Bayes
+bayes_fn = function(control_alive, control_dead, intervention_alive, intervention_dead) {
+  bayes_matrix = matrix(c(intervention_dead,control_dead,intervention_alive,control_alive), 2, 2)
+  BFM_10 = contingencyTableBF(bayes_matrix,
+                              sampleType = "indepMulti",
+                              fixedMargin = "rows",
+                              priorConcentration = 1)
+  extractBF(BFM_10)$bf
+}
+
+bayes_fn = Vectorize(bayes_fn)
+
+### PPV
+ppv_fn = function(BF){
+  ppv = BF / (BF + 1)
+  ppv = round(ppv, round_val) * 100
+  ppv = paste(ppv, "%", sep = "")
+  ppv
+}
+
+### FPR
+fpr_fn = function(BF){
+  ppv = BF / (BF + 1)
+  fpr = 1 - ppv
+  fpr = round(fpr, round_val) * 100
+  fpr = paste(fpr, "%", sep = "")
+  fpr
+}
+
+### NPV
+npv_fn = function(BF){
+  npv = 1/(BF + 1)
+  npv = round(npv, round_val) * 100
+  npv = paste(npv, "%", sep = "")
+  npv
+}
+
+### FNR
+fnr_fn = function(BF) {
+  npv = 1/(BF + 1)
+  fnr = 1 - npv
+  fnr = round(fnr, round_val) * 100
+  fnr = paste(fnr, "%", sep = "")
+  fnr
+}
+
+## Define variables
+round_val = 3
+
+
+## Load data
+data <- read_excel("../jake bayes.xlsx")
+
+
+## Tidy data
+data = data %>%
+  clean_names() %>%                                                                     #Janitor to clean up the variable names
+  mutate(trial_category = factor(trial_category,
+                                 levels = c("Significant trials",
+                                            "Non-significant trials",
+                                            "Adaptive Platform Trials")),
+         `_n_` = control_alive + control_dead + intervention_alive + intervention_dead,
+         Year = format(as.yearmon(date, "%Y %b"),
+                       "%Y"),
+         reported_p_value = as.numeric(na_if(reported_p_value, "NR")),                  #Remove the NRs and change to numeric
+         calculated_p_value = ifelse(is.na(reported_p_value),                           #Calculate p-values for the missing variables
+                                     prop_fn(control_alive = control_alive,
+                                             control_dead = control_dead,
+                                             intervention_alive = intervention_alive,
+                                             intervention_dead = intervention_dead),
+                                     NA),
+         `p value` = ifelse(is.na(calculated_p_value),                                  #Create the p-value for the table, and add an '*' to calculated values
+                            reported_p_value,
+                            paste(calculated_p_value, "*", sep = "")),
+         `p value` = ifelse(`p value` == "0*",
+                            "<0.001*",
+                            `p value`),
+         BF = bayes_fn(control_alive = control_alive,                                   #Calculate BF
+                       control_dead = control_dead,
+                       intervention_alive = intervention_alive,
+                       intervention_dead = intervention_dead),
+         `BF~1:0~` = ifelse(outcome != "Non-significant",                               #Create the BF variables for the table. Use != because there are 2...
+                           round(BF, 2),                                                #variables for significance, but only one for non-sig
+                           NA),
+         `BF~0:1~` = ifelse(outcome == "Non-significant",
+                           round(1/BF, 2),
+                           NA),
+         PPV = ifelse(outcome != 'Non-significant',                                     #Run the functions to create the rest of the variables
+                      ppv_fn(BF),
+                      NA),
+         FPR = ifelse(outcome != 'Non-significant',
+                      fpr_fn(BF),
+                      NA),
+         NPV = ifelse(outcome == 'Non-significant',
+                      npv_fn(BF),
+                      NA),
+         FNR = ifelse(outcome == 'Non-significant',
+                      fnr_fn(BF),
+                      NA))
+
+## Save Data
+write_rds(data, "bayes_data.Rds")
+
+```
+
+```{r echo=FALSE, warning = FALSE, message = FALSE}
+# Make the main table
+
+## Load packages
+library(data.table)
+library(viridis)
+library(kableExtra)
+library(formattable)
+
+## Set options
+options(kableExtra.auto_format = FALSE)
+options(knitr.kable.NA = '')
+options(knitr.table.format = "latex")
+
+## Make a trimmed dataset for the table
+tab_data = data %>%                                                                   
+  rename(Author = author,
+         Title = title) %>%
+  arrange(trial_category, Author) %>%
+  select(Author, Year, Title, `_n_`, `p value`, `BF~1:0~`, `BF~0:1~`, FPR, FNR)
+
+## Make a function to determine the color for the BF columns
+colour_bf = function(x) {
+  value = cut(x,
+              breaks = c(0,1,3,10,30,100,+Inf),
+              labels = viridis(6, alpha = 0.2, option = "turbo", direction = -1, begin = 0.2),
+              right = TRUE,
+              include.lowest = TRUE)
+  value = as.character(value)
+  value
+}
+
+## Function to determine color of FPR/FNR columns
+## Errors with generating colour in a similar way to colour_bf, so we use case_when
+```
+
+```{r echo=FALSE, warning = FALSE, message = FALSE, eval = TRUE}
+## Make the table with colour
+## HTML output only
+
+tab_data %>%
+  mutate(across(c(`BF~1:0~`, `BF~0:1~`), function(x){
+    case_when(!is.na(x) ~ color_bar(colour_bf(x))(x))
+  })) %>%
+  mutate(across(c(FPR, FNR), function(x) {
+    case_when(parse_number(x) < 5 ~ cell_spec(x, color = "#3E9BFEFF"),
+              parse_number(x) < 20 ~ cell_spec(x, color = "#d7ad00FF"),
+              parse_number(x) >= 20 ~ cell_spec(x, color = "#C42503FF"))
+  })) %>%
+  kable("html", caption = "Table: Included Trials", escape = F) %>%
+  kable_styling("hover", full_width = F) %>%
+  footnote(symbol = "p value calculated from trial data")
+
+```
+
+```{r echo=FALSE, warning = FALSE, message = FALSE, eval = FALSE}
+# Table without colour
+# PDF output only
+
+tab_data %>%
+  rename(n = `_n_`,
+         `BF 1:0` = `BF~1:0~`,
+         `BF 0:1` = `BF~0:1~`) %>%
+  kbl("latex", booktabs = T, longtable = T,
+        caption = "Table: Included Trials") %>%
+  column_spec(3, width = "20em") %>%
+  footnote(symbol = "p value calculated from trial data",
+           threeparttable = T) %>%
+  landscape()
+```
