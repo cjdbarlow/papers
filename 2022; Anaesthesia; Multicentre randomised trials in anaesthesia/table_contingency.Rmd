@@ -1,0 +1,97 @@
+---
+output: word_document
+---
+
+```{r setup, eval = TRUE, echo=FALSE, results='asis', warning=FALSE, message = FALSE, include = FALSE}
+# Setup
+knitr::opts_chunk$set(eval = TRUE, echo=FALSE, results='asis', warning=FALSE, message = FALSE, include = FALSE)
+options(knitr.kable.NA = '')
+
+# Load libraries
+library(tidyverse)
+library(knitr)
+library(flextable)
+
+
+# Load data
+data = readRDS("data/data.Rds")
+
+num_no_zero = function(x){
+  x = as.numeric(x)
+  x = format(x, scientific = FALSE)
+  x = as.character(x)
+  x = stringr::str_remove(x, "\\.?0+$")
+  x
+}
+
+
+# Tidy data for presentation
+data = data %>%
+  mutate(name = paste(first_author, ". ", title, ". [", ref.no, "]", sep = ""),
+         p_value = ifelse(is.na(p_value),
+                          paste(num_no_zero(p_value_calculated), "†", sep = ""),
+                          num_no_zero(p_value)),
+         BF01 = 1/BF,
+         BF01 = ifelse(BF01 < 0.001, "<0.001", as.character(round(BF01, 3))),
+         pH0d = as.numeric(sub("%", "", ifelse(significant == "Y", FPR, NPV)))/100,
+         pH0d = ifelse(pH0d < 0.001, "<0.001", as.character(pH0d)), 
+         `Total Dead` = event_intervention + event_control,
+         `Total Alive` = n_intervention + n_control - `Total Dead`,
+         `Control Alive` = n_control - event_control,
+         `Intervention Alive` = n_intervention - event_intervention,
+         `Total` = n_intervention + n_control) %>%
+  rename(`Total Intervention` = n_intervention,
+         `Intervention Dead` = event_intervention,
+         `Control Dead` = event_control,
+         `Total Control` = n_control)
+
+data$cont_table = apply(data, 1, function(x) {
+  data.frame("pos" = c(x["Intervention Dead"], x["Control Dead"], x["Total Dead"]),
+             "neg" = c(x["Intervention Alive"], x["Control Alive"], x["Total Alive"]),
+             "Total" = c(x["Total Intervention"], x["Total Control"], x["Total"]),
+             row.names = c("Intervention", "Control", "Total"))
+})
+
+sig = data[data$significant == "Y",]
+non_sig = data[data$significant == "N",]
+```
+
+```{r Contingency_tables, include = TRUE}
+
+for (i in 1:nrow(data)) {
+  # Get data
+  row = data[i,]
+  
+  # Build table
+  ft = flextable(as.data.frame(row$cont_table) %>%
+                   rownames_to_column(" ")) %>%
+    set_caption(caption = row$name,
+                autonum = officer::run_autonum(seq_id = "tab")) %>%
+    set_header_labels(pos = "Outcome Positive",
+                      neg = "Outcome Negative") %>%
+    set_table_properties(layout = "autofit") %>%
+      flextable::footnote(i = 1, j = 1:2,
+                        value = as_paragraph(c(paste("Bayes' Factor 0:1:", row$BF01),
+                                               paste("p(H0|data):", row$pH0d))),
+                        ref_symbols = rep("", 2))
+
+  # Write the footnote, depending on whether the trial is significant or non-significant
+  # if(row$significant == "Y"){
+  #   ft = ft %>%
+  #     flextable::footnote(i = 1, j = 1:2,
+  #                       value = as_paragraph(c(paste("Bayes Factor 1:0:", format(round(row$BF, 2), nsmall = 2)),
+  #                                              paste("p(H0|data):", format(row$pH0d, nsmall = 2)))),
+  #                       ref_symbols = rep("", 2))
+  # } else {
+  #   ft = ft %>%
+  #     flextable::footnote(i = 1, j = 1:2,
+  #                       value = as_paragraph(c(paste("Bayes' Factor 0:1:", format(round(row$BF01, 3), nsmall = 2)),
+  #                                              paste("p(H0|data):", format(row$pH0d, nsmall = 2)))),
+  #                       ref_symbols = rep("", 2))
+  # }
+  
+  cat(knit_print(ft))
+  cat("\\linebreak &nbsp; \\linebreak &nbsp; \\linebreak")    
+}
+
+```

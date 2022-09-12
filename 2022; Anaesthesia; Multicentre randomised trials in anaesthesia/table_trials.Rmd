@@ -1,0 +1,63 @@
+---
+output: html_document #kableExtra doesn't produce word output but is better than flextalbe for these output formats, so we just copy-paste the html to word.
+---
+
+```{r setup, eval = TRUE, echo=FALSE, results='asis', warning=FALSE, message = FALSE, include = FALSE}
+# Setup
+knitr::opts_chunk$set(eval = TRUE, echo=FALSE, results='asis', warning=FALSE, message = FALSE, include = FALSE)
+options(knitr.kable.NA = '')
+
+# Load libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+
+# Load data
+names = readRDS("data/names.Rds")
+data = readRDS("data/data.Rds")
+
+## Function to remove trailing 0s (and decimal, e.g. if equals 1.0) from an number for formatting
+num_no_zero = function(x){
+  x = as.numeric(x)
+  x = format(x, scientific = FALSE)
+  x = as.character(x)
+  x = stringr::str_remove(x, "\\.?0+$")
+}
+
+# Tidy data for presentation
+data = data %>%
+  mutate(total = n_intervention + n_control,
+         p_value = ifelse(is.na(p_value),
+                          paste(num_no_zero(p_value_calculated), "†", sep = ""),
+                          num_no_zero(p_value)),
+                  # Change to include both BF 1:0 and 0:1 for all tables in output tables, at request of editor
+         `BF~1:0~` = round(BF, 3),
+         `BF~0:1~` = round(1/BF, 3))
+```
+
+```{r TABLE: Included Trials, include = TRUE}
+
+data %>%
+  mutate(first_author = paste(first_author, " [", ref.no, "]", sep = ""),
+         pH0d = as.numeric(sub("%", "", ifelse(significant == "Y", FPR, NPV)))/100,
+         pH0d = ifelse(pH0d < 0.001, "<0.001", as.character(pH0d)), 
+         `BF~0:1~` = ifelse(`BF~0:1~` < 0.001, "<0.001", as.character(`BF~0:1~`))) %>%
+  select(first_author, date, title, journal, total, p_value, `BF~0:1~`, pH0d) %>%
+  # Rename the columns
+  rename(Year = date,
+         `_n_` = total,
+         `p-value` = p_value,
+         `p(H~0~|data)` = pH0d) %>%
+  data.table::setnames(old = names$clean_names,
+                       new = names$nice_names,
+                       skip_absent = TRUE) %>%
+  # Make table
+  kable(digits = 3,
+        caption = "Table: Included Trials",
+        align = "lrllrrrrrr") %>%
+  kable_styling("hover", full_width = F) %>%
+  footnote(symbol = c("Factorial design or co-primary outcome",
+                      "p-value calculated from trial data"))
+
+```
