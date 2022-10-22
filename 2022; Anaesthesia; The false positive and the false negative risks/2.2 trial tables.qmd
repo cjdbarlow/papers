@@ -1,0 +1,65 @@
+---
+format: docx
+editor: source
+---
+
+```{r setup, output = FALSE, echo = FALSE}
+# Libraries
+library(tidyverse)
+library(quarto)
+library(knitr)
+library(docxtools)
+
+source("functions-bf.R")
+
+# Data
+trimmed = readRDS("data/trimmed.Rds")
+
+
+```
+
+
+```{r, echo = FALSE} 
+# Set up data
+d.table = trimmed %>%
+    # Remove variables we don't want
+    select(-c(n_con, e_con, n_int, e_int, cer, arr, p.value, sig)) %>%
+    # Drop the leading bf_ column name as it provides no information
+    rename_with(~ gsub("^bf_", "", .)) %>%
+    # Add a _bf to the actual BFs to distinguish them from FNR/FPR; then pivot around the trailing `_`
+    rename_with(~ paste(., "_bf", sep = ""), !ends_with(c("_fpr", "_fnr", "author"))) %>%
+    group_by(author) %>%
+    pivot_longer(cols = -c(author),
+                 names_to = c("Method", ".value"),
+                 names_pattern = "(.*)_(.*)$") %>%
+    # Drop duplicated values for the table output as we can't do this with kable
+    mutate(author = replace(author, duplicated(author), ""),
+           # Truncate BF/FNR/FPR at 2 significant digits
+           across(where(is.numeric), fn.signif_var, digits = 2),
+           # Convert FPR and FNR to %s (and a character vector), leaving NAs as NAs
+           across(c(fpr, fnr), ~ ifelse(is.na(.), NA_character_, paste(. * 100, "%", sep = "")))) %>%
+    ungroup() %>%
+    # Drop the MCMC ones for now
+    filter(Method != "mcmc_uip" & Method != "mcmc_wip") %>%
+    # Tidy up
+    rename(Author = author,
+           `BF 1:0` = bf,
+           FNR = fnr,
+           FPR = fpr) %>%
+    mutate(Method = case_when(Method == "gd" ~ "Gunel-Dickey",
+                              Method == "kv" ~ "Kass-Vaidyanathan",
+                              Method == "conj_uip" ~ "Conjugate, Uniform Prior",
+                              Method == "conj_wip" ~ "Conjugate, Weakly-informed Prior",
+                              Method == "mcmc_uip" ~ "MCMC, Uniform Prior",
+                              Method == "mcmc_wip" ~ "MCMC, Weakly-informed Prior",
+                              Method == "selke" ~ "Selke",
+                              TRUE ~ NA_character_))
+
+# Output table
+options(knitr.kable.NA = "")
+options(scipen = 1000000)
+
+d.table %>%
+    kable(digits = 3)
+
+```
