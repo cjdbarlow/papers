@@ -1,5 +1,7 @@
 # Papers
 
-This repo contains code and analysis for academic papers that I have contributed analysis for.
+This repository houses statistical code for published work where I was the primary analyst. It is provided in order increase transparency about the underlying methodology and lower the barrier to replication. It may also be educational.
 
-Source data may or may not be included, depending on the nature of the study. Simulation data may or may not be included (depending on the size of the files), but can be built from the included scripts. The repo is organised into a series of subfolders, listed by year, journal, and title. Further information on the reference can be found in the relevant subfolder.
+Real patient data is not included. *Simulation* data may or may not be included (depending on the size of the files), but can always be built from the included scripts.
+
+The repository is organised into a series of subfolders, each containing the standalone code for each paper. Work under review may be visible under a working title. Articles in-print are listed by year, journal, and title, with the full reference available in the relevant subfolder.
