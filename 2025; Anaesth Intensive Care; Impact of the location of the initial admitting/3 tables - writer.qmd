@@ -1,0 +1,129 @@
+---
+title: "Tables"
+format: html
+toc: true
+toc-depth: 3
+toc-expand: 3
+execute:
+    warning: false
+    echo: false
+---
+
+```{r cache = FALSE}
+#| include: false
+
+# Libraries
+library(tidyverse)
+library(finalfit)
+library(knitr)
+library(kableExtra)
+
+# Data
+data.t1_matched = readRDS("tables/data.t1_balance.matched.Rds")
+data.t1_all = readRDS("tables/data.t1_balance.all.Rds")
+
+data.t2_missing = readRDS("tables/t2_missing.Rds")
+
+data.t3.1 = readRDS("tables/t3.1.Rds")
+data.t3.2 = readRDS("tables/t3.2.Rds")
+
+t4 = readRDS("tables/t4_source.Rds")
+
+t5 = readRDS("tables/t5_source.Rds")
+
+
+# Options
+options(knitr.kable.NA = "",
+        digits = 3)
+
+options(scipen = 999)
+
+```
+
+# Table: Balance Characteristics
+## Matched data only
+### Everything that is a %
+```{r}
+data.t1_matched %>%
+    mutate(across(c(`Received ECMO (Mean)`, `Did not receive ECMO (Mean)`),  ~ magrittr::multiply_by(., 100))) %>%
+    # Comment out the above line for the non-% columns, because this is easier than rounding
+    # Next time, we're using gttable
+    select(-c(`eCDF Mean`, `eCDF Max`, `Std. Pair Dist.`)) %>%
+    kable(caption = "Table: Balance of Matched Cohort",
+          digits = 1)
+```
+
+### Everything that isn't a %
+```{r}
+data.t1_matched %>%
+    #mutate(across(c(`Received ECMO (Mean)`, `Did not receive ECMO (Mean)`),  ~ magrittr::multiply_by(., 100))) %>%
+    # Comment out the above line for the non-% columns, because this is easier than rounding
+    # Next time, we're using gttable
+    select(-c(`eCDF Mean`, `eCDF Max`, `Std. Pair Dist.`)) %>%
+    kable(caption = "Table: Balance of Matched Cohort",
+          digits = 1)
+```
+
+
+## Before and after matching
+
+```{r}
+t2.together = cbind(data.t1_all[1:8], # Drop the last standardised pair difference
+                    data.t1_matched[3:9]) %>%
+    kable(caption = "Table: Balance Before and After Matching") %>%
+    add_header_above(c(" " = 2,
+                       "Before Matching" = 6,
+                       "After Matching" = 7))
+
+t2.together
+```
+
+# Table: Baseline Characteristics
+```{r}
+data.t2_missing %>%
+    kable(caption = "Table: Baseline characteristics of pre-imputed data")
+
+```
+
+
+# Table: Comparison of Imputed Cohorts
+```{r eval = FALSE}
+
+data.t3.1 %>%
+    kable(caption = "Table: Comparison of Imputed Cohorts",
+          align = c("l", "l", "r", "r")) %>%
+    footnote(general = "Patient numbers in each group may vary across each imputations, which is a property of full matching with caliper restriction. This table demonstrates the mean of each value (sum, mean, or standard deviation) across all of the imputed datasets.")
+
+data.t3.2 %>%
+    kable(caption = "Table: Comparison of Imputed Cohorts",
+          align = c("l", "l", "r", "r")) %>%
+
+    
+data.t3_matched %>%
+    relocate(sd_max_TRUE, .after = value_TRUE) %>%
+    mutate(metric = case_when(metric == "mean" ~ "Weighted Mean",
+                              metric == "n" ~ NA_character_,
+                              TRUE ~ tools::toTitleCase(metric))) %>%
+    kable(caption = "Table: Comparison of Imputed Cohorts",
+          align = c("l", "l", "l", "r", "r", "r", "r"),
+          col.names = c("Covariates", "", "Metric",
+                        "Min — Max. (Mean)", "Max. SD", 
+                        "Min — Max. (Mean)", "Max. SD")) %>%
+    add_header_above(c(" " = 3, "ECMO Episode" = 2, "Non-ECMO Episode" = 2)) %>%    
+    footnote(general = "Patient numbers vary across imputations, which is a property of full matching with caliper restriction. Range of imputed means and the maximal SD indicate the uncertainty of imputed values.")
+
+```
+
+# Table: Source
+```{r}
+
+t4 %>%
+    kable(caption = "Table: Comparison of ECMO Patients by Hospital Admission Source")
+```
+
+# Table: N ECMO per site
+```{r}
+
+t5 %>%
+    kable(caption = "Table: Comparison of ECMO Cases by ECMO Centre Type")
+```
