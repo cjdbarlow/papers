@@ -4,4 +4,4 @@ This repository houses statistical code for published work where I was the prima
 
 Real patient data is not included. *Simulation* data may or may not be included (depending on the size of the files), but can always be built from the included scripts.
 
-The repository is organised into a series of subfolders, each containing the standalone code for each paper. Work under review may be visible under a working title. Articles in-print are listed by year, journal, and title, with the full reference available in the relevant subfolder.
+The repository is organised into a series of subfolders, each containing the standalone code for each paper. Work under review or on a pre-print server may be visible under a working title. Articles in-print are listed by year, journal, and title, with the full reference available in the relevant subfolder.
