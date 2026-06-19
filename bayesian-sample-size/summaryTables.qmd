@@ -1,0 +1,178 @@
+---
+title: "Tables"
+format:
+  docx:
+    # Landscape A4
+    reference-doc: landscapeReference.docx
+    # Stops pandoc assigning fixed column widths; let word autofit
+    columns: 300
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+library(tidyverse)
+library(arrow)
+
+source("functions.R")
+
+simSettings = read_parquet("data/simSettings.parquet")
+resultsNormalApprox = readRDS("data/resultsNormalApprox.rds")
+resultsAssurance = read_parquet("data/resultsAssurance.parquet")
+resultsFreq = read_parquet("data/resultsFreq.parquet")
+
+## Target power thresholds (match the simulation setup)
+powerTargets = c(0.8, 0.9)
+
+## One row per risk difference scenario
+scenarios = simSettings |>
+    distinct(pCon, pInt, riskDiff, OR, nTrialSizeCap)
+
+## Bayesian Power curve: proportion of simulated trials declaring benefit
+bayesCurve = resultsNormalApprox |>
+    group_by(pInt, cv, nTrialSize) |>
+    summarise(
+        power = mean(success, na.rm = TRUE),
+        .groups = "drop"
+    )
+
+## Frequentist Assurance curve: closed-form power averaged over the design prior
+assuranceCurve = resultsAssurance |>
+    select(pInt, cv, nTrialSize, power = assurancePower)
+```
+
+```{r}
+## Function to calculate a single scenariors power for a given n and CV
+summariseCurve = function(curve, checkpoints) {
+    ## Power at each checkpoint: one row per cv + checkpoint combo
+    checkpointPower = curve |>
+        expand_grid(checkpoint = checkpoints) |>
+        group_by(cv, checkpoint) |>
+        slice_min(abs(nTrialSize - checkpoint), n = 1, with_ties = FALSE) |>
+        ungroup() |>
+        pivot_wider(
+            id_cols = cv,
+            names_from = checkpoint,
+            values_from = power,
+            names_prefix = "powerAt_"
+        )
+
+    ## Interpolated total sample size at each target power
+    targetN = curve |>
+        nest(powerCurve = c(nTrialSize, power)) |>
+        expand_grid(powerTarget = powerTargets) |>
+        rowwise() |>
+        mutate(nForTarget = interp_n_for_power(powerCurve, powerTarget)) |>
+        ungroup() |>
+        pivot_wider(
+            id_cols = cv,
+            names_from = powerTarget,
+            values_from = nForTarget,
+            names_prefix = "nFor_"
+        )
+
+    checkpointPower |>
+        left_join(targetN, by = join_by(cv)) |>
+        mutate(
+            # p-infinity = power ceiling
+            pInfinity = pnorm(1 / cv),
+            .after = cv
+        )
+}
+
+## Format for printing: powers as proportions, N values as comma-separated, NA (target power never reached within the trial sample size) as "-"
+formatPower = function(power) {
+    sprintf("%.3f", power)
+}
+
+formatN = function(n) {
+    if_else(is.na(n), "-", scales::comma(round(n)))
+}
+
+## Explanatory footer printed under each table
+tableFootnote = "*\"-\": the target power was not reached within the simulated trial sizes.*\n\n"
+
+## Word page break
+pageBreak = "```{=openxml}\n<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>\n```\n\n"
+
+formatSummary = function(summary, checkpoints) {
+    summary |>
+        mutate(
+            across(starts_with("powerAt_"), formatPower),
+            across(starts_with("nFor_"), formatN),
+            pInfinity = sprintf("%.2f", pInfinity)
+        ) |>
+        set_names(c(
+            "CV",
+            "p∞",
+            paste0("Power at n = ", scales::comma(checkpoints)),
+            paste0("N for ", scales::percent(powerTargets), " power")
+        ))
+}
+```
+
+```{r}
+#| results: asis
+
+# Make all the tables
+for (i in seq_len(nrow(scenarios))) {
+    scenario = scenarios[i, ]
+
+    ## Trim each curve to the scenario's simulated range
+    bayes = bayesCurve |>
+        filter(pInt == scenario$pInt, nTrialSize <= scenario$nTrialSizeCap)
+    assurance = assuranceCurve |>
+        filter(pInt == scenario$pInt, nTrialSize <= scenario$nTrialSizeCap)
+    freq = resultsFreq |>
+        filter(pInt == scenario$pInt, nTrialSize <= scenario$nTrialSizeCap) |>
+        rename(power = freqPower)
+
+    ## N checkpoints spread across the simulated range, as in the reference
+    checkpoints = unique(quantile(
+        unique(bayes$nTrialSize),
+        probs = c(0.1, 0.25, 0.5, 0.75, 1.0),
+        type = 1
+    ))
+
+    cat(sprintf("## RD = %.2f (OR = %.2f)\n\n", -scenario$riskDiff, scenario$OR))
+
+    ## Conventional frequentist reference at the assumed (fixed) effect size
+    freqN = tibble(powerTarget = powerTargets) |>
+        rowwise() |>
+        mutate(nForTarget = interp_n_for_power(freq, powerTarget)) |>
+        ungroup()
+
+    cat(sprintf(
+        "Conventional frequentist (α=0.025, one-sided, assumed effect size): %s.\n\n",
+        paste(
+            sprintf(
+                "N for %s power = %s",
+                scales::percent(freqN$powerTarget),
+                formatN(freqN$nForTarget)
+            ),
+            collapse = "  |  "
+        )
+    ))
+
+    print(knitr::kable(
+        summariseCurve(bayes, checkpoints) |> formatSummary(checkpoints),
+        caption = sprintf("Bayesian Power, RD = %.2f", -scenario$riskDiff),
+        align = "r"
+    ))
+    cat("\n\n", tableFootnote, pageBreak)
+
+    print(knitr::kable(
+        summariseCurve(assurance, checkpoints) |> formatSummary(checkpoints),
+        caption = sprintf("Frequentist Assurance, RD = %.2f", -scenario$riskDiff),
+        align = "r"
+    ))
+    cat("\n\n", tableFootnote)
+
+    ## Page break after each table, except the very last (avoids a blank trailing page)
+    if (i < nrow(scenarios)) {
+        cat(pageBreak)
+    }
+}
+```
