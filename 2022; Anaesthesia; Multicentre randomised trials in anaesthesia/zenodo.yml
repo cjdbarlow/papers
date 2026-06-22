@@ -1,0 +1,25 @@
+# Any folder with a `zenodo.yml` will get opted in to DOI minting
+# Requires: title, description, creators
+
+title: "Multicentre randomised trials in anaesthesia: an analysis using Bayesian metrics."
+
+description: >
+  Statistical analysis code for this manuscript
+
+creators:
+  - name: "Seretny, Marta"
+    affiliation: "Department of Anaesthesia, Auckland City Hospital, Auckland, New Zealand"
+    orcid: "0000-0003-0615-1224"
+  - name: "Barlow, Jake"
+    affiliation: "Department of Cardiothoracic and ORL Anaesthesia, Auckland City Hospital, Auckland, New Zealand"
+    orcid: "0000-0003-3713-8292"
+  - name: "Sidebotham, David"
+    affiliation: "Department of Cardiothoracic and ORL Anaesthesia, Auckland City Hospital, Auckland, New Zealand"
+    orcid: "0000-0001-9478-021X"
+
+license: "GPL-3.0-or-later"
+
+related_identifiers:
+  - relation: isSupplementTo
+    identifier: "10.1111/anae.15867"
+    resource_type: publication-article
