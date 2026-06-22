@@ -1,0 +1,62 @@
+name: Mint Zenodo DOIs
+
+# Archives opted-in paper subfolders (those containing a zenodo.yml) to
+# Zenodo and writes back a doi.md plus the central .zenodo-state.json.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Override Zenodo environment for this run"
+        type: choice
+        options: [sandbox, production]
+        default: sandbox
+
+concurrency:
+  # Never let two runs mint against the same state file at once.
+  group: zenodo-doi
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # needed to commit doi.md and the state file back
+
+jobs:
+  zenodo:
+    runs-on: ubuntu-latest
+    # Skip the run the workflow's own write-back commit triggers.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests pyyaml
+
+      - name: Resolve environment
+        id: env
+        run: |
+          ENV="${{ github.event.inputs.environment || vars.ZENODO_ENV || 'sandbox' }}"
+          echo "zenodo_env=$ENV" >> "$GITHUB_OUTPUT"
+          echo "Using Zenodo environment: $ENV"
+
+      - name: Mint / update DOIs
+        id: mint
+        env:
+          ZENODO_ENV: ${{ steps.env.outputs.zenodo_env }}
+          ZENODO_TOKEN: ${{ steps.env.outputs.zenodo_env == 'production' && secrets.ZENODO_TOKEN || secrets.ZENODO_SANDBOX_TOKEN }}
+          # DATA_DIR_NAMES: data,raw,data-raw   # uncomment to override defaults
+        run: python .github/scripts/zenodo_deposit.py
+
+      - name: Commit DOI files and state
+        if: steps.mint.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(zenodo): update DOIs and state [skip ci]"
+          git push
