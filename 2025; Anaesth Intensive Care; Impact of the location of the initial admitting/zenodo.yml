@@ -1,0 +1,31 @@
+# Any folder with a `zenodo.yml` will get opted in to DOI minting
+# Requires: title, description, creators
+
+title: "Impact of the location of the initial admitting intensive care unit on the delivery of extracorporeal membrane oxygenation in Australia and New Zealand"
+
+description: >
+  Statistical analysis for this manuscript.
+
+creators:
+  - name: "Barlow, Jake"
+    affiliation: "Department of Cardiothoracic and ORL Anaesthesia, Auckland City Hospital, Auckland, New Zealand"
+    orcid: "0000-0003-3713-8292"
+  - name: "Brown, Alastair J."
+    affiliation: "Department of Intensive Care and Hyperbaric Medicine, The Alfred Hospital, Melbourne, Australia"
+    orcid: "0000-0002-3137-4895"
+  - name: "Evans, Tess"
+    affiliation: "Intensive Care Services, Royal Brisbane and Women's Hospital, Brisbane, Australia"
+    orcid: "0000-0001-7764-4363"
+  - name: "Sidebotham, David"
+    affiliation: "Department of Cardiothoracic and ORL Anaesthesia, Auckland City Hospital, Auckland, New Zealand"
+    orcid: "0000-0001-9478-021X"
+  - name: "Pilcher, David V."
+    affiliation: "Department of Intensive Care and Hyperbaric Medicine, The Alfred Hospital, Melbourne, Australia"
+    orcid: "0000-0002-8939-7985"
+
+license: "GPL-3.0-or-later"
+
+related_identifiers:
+  - relation: isSupplementTo
+    identifier: "10.1177/0310057X251358274"
+    resource_type: publication-article
