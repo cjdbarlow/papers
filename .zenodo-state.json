@@ -26,5 +26,19 @@
     "content_hash": "7658a57fd44ec5b01104c064785b19916fcb21333c8d0a9527760c1b2729bb0f",
     "last_version_doi": "10.5281/zenodo.20794399",
     "record_url": "https://zenodo.org/record/20794399"
+  },
+  "2024; Anaesthesia; The Central Limit Theorm": {
+    "concept_doi": "10.5281/zenodo.20794424",
+    "concept_recid": "20794424",
+    "content_hash": "9eee0c336485039891e1406d1cac2b4e88b2351f234a26c11df3b99d55ed1b56",
+    "last_version_doi": "10.5281/zenodo.20794425",
+    "record_url": "https://zenodo.org/record/20794425"
+  },
+  "2025; Anaesth Intensive Care; Impact of the location of the initial admitting": {
+    "concept_doi": "10.5281/zenodo.20794426",
+    "concept_recid": "20794426",
+    "content_hash": "71af788f0294a12f36b4627deb13f567a8b2ecb0737da8ef540a6719b30d83ec",
+    "last_version_doi": "10.5281/zenodo.20794427",
+    "record_url": "https://zenodo.org/record/20794427"
   }
 }
